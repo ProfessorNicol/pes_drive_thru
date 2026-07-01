@@ -1,0 +1,33 @@
+{
+    "menu_stations": [
+        {
+            "name": "menu_station_1",
+            "service_mu": 5,
+            "service_rho": 0.5,
+            "service_dist": "uniform"
+        },
+        {
+            "name": "menu_station_2",
+            "service_mu": 5,
+            "service_rho": 0.5,
+            "service_dist": "uniform"
+        },
+        {
+            "name": "menu_station_3",
+            "service_mu": 5,
+            "service_rho": 0.5,
+            "service_dist": "uniform"
+        } ],
+    "pay_station": {
+        "name": "pay_station_1",
+        "service_mu": 20,
+        "service_rho": 0.5,
+        "service_dist": "uniform"
+    },
+    "pickup_station": {
+        "name": "pickup_1",
+        "service_mu": 10,
+        "service_rho": 0.5,
+        "service_dist": "uniform"
+    }
+}
