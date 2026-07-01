@@ -1,0 +1,7 @@
+-arrival_rate 0.05    # comment
+-termination 6000     # another comment
+-serving_limit 6
+-seed 24356
+-min_order 2
+-max_order 8
+-topo input.json
