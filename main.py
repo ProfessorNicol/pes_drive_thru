@@ -5,7 +5,7 @@ import math
 import argparse
 import random
 import json
-pyEvtSimDir = '/Users/nicol/Dropbox/Teaching/Pioneer-Simulation/code/des/pyEvtSim'
+pyEvtSimDir = '/Users/profnicol/pyevtsim'
 sys.path.append(pyEvtSimDir)
 
 from vrt import VT, VTZero, PriPair
@@ -28,11 +28,11 @@ pay_station = None
 pickup_station = None
 MenuStations = []
 
-customerID = 0
+customerCnt  = 0
 def NxtCustomerID():
-    global customerID
-    customerID += 1
-    return customerID
+    global customerCnt
+    customerCnt += 1
+    return customerCnt
 
 
 # Customer entity is created specifying a name, the minimum number of items to be ordered,
@@ -40,20 +40,17 @@ def NxtCustomerID():
 
 
 class Customer():
-    def __init__(self, name: str, min_order, max_order: int):
+    def __init__(self, min_order, max_order: int):
         # uniformly sample from range of possible order sizes
         self.num_items = sampleInt(min_order, max_order)
 
         # unique customer ID
-        self.customerID = NxtCustomerID()
+        self.ID = NxtCustomerID()
     
-        # Remember the string giving the customer's name
-        self.name = name
-
-        # print(f"Customer {customerID} arrives at time {EvtMgr.NowInSecs()}")
+        # print(f"Customer {self.ID} arrives at time {EvtMgr.NowInSecs()}")
 
     def customerID(self) -> int:
-        return self.customerID
+        return self.ID
 
 # CustomerStream is the process of generating arrivals to the system.
 # Poisson arrivals are simulated, but if there are too many admitted
@@ -123,14 +120,13 @@ class CustomerStream():
                 self.arrivals += 1
 
                 # Create the customer instance.
-                customer = Customer(
-                    f"customer-{customerID}", MIN_ORDER, MAX_ORDER)
+                cust = Customer(MIN_ORDER, MAX_ORDER)
 
                 # Record the customer's arrival time.
-                self.AddObs("start", EvtMgr.NowInSecs(), customerID)
+                self.AddObs("start", EvtMgr.NowInSecs(), cust.customerID())
 
                 # Choose a menu station and deliver the customer to it.
-                self.deliverCustomer(customer)
+                self.deliverCustomer(cust)
 
         # Schedule the next arrival
         # sampling from an exponential probability distribution
@@ -166,7 +162,7 @@ class CustomerStream():
     # of customers being served.
 
     def departCust(self, cust):
-        self.AddObs("stop", EvtMgr.NowInSecs(), cust.customerID)
+        self.AddObs("stop", EvtMgr.NowInSecs(), cust.customerID())
         self.serving_customers -= 1
 
     # AddObs registers an observation to the object's own trace list.
@@ -187,7 +183,7 @@ class CustomerStream():
 
 
 class MenuStation(ModelQueue):
-    def __init__(self, name, service_mu, service_rho, service_dist):
+    def __init__(self, name, service_mu, service_sigma, service_dist):
 
         # Tell the ModelQueue representation of the function to use
         # when sampling service.
@@ -197,7 +193,7 @@ class MenuStation(ModelQueue):
 
         # remember the parameters
         self.service_mu = service_mu
-        self.service_rho = service_rho
+        self.service_sigma = service_sigma
         self.service_dist = service_dist
 
     def menuService(self, cust):
@@ -205,7 +201,7 @@ class MenuStation(ModelQueue):
         service = 0.0
         for idx in range(0, cust.num_items):
             service += sampleRV(
-                self.service_mu, self.service_rho, self.service_dist)
+                self.service_mu, self.service_sigma, self.service_dist)
         return service
 
 # The PayStation represents where drive-thru customers advance to pay for the
@@ -216,11 +212,11 @@ class MenuStation(ModelQueue):
 
 class PayStation(ModelQueue):
 
-    def __init__(self, name, service_mu, service_rho, service_dist):
+    def __init__(self, name, service_mu, service_sigma, service_dist):
         super().__init__(name, self.payService)
         self.name = name
         self.service_mu = service_mu
-        self.service_rho = service_rho
+        self.service_sigma = service_sigma
         self.service_dist = service_dist
 
     # the paying service uses the distributions available through the rng 
@@ -228,7 +224,7 @@ class PayStation(ModelQueue):
 
     def payService(self, cust):
         # service time
-        return sampleRV(self.service_mu, self.service_rho, self.service_dist)
+        return sampleRV(self.service_mu, self.service_sigma, self.service_dist)
 
 # A PickupStation is a queue where a customer waits for their order to complete,
 # and leaves when it is finished.  Distribution parameters of the time between when
@@ -238,13 +234,13 @@ class PayStation(ModelQueue):
 
 class PickupStation(ModelQueue):
 
-    def __init__(self, name, service_mu, service_rho, service_dist, report_exit):
+    def __init__(self, name, service_mu, service_sigma, service_dist, report_exit):
         # The construction parameters for a ModelQueue are the service function to call,
         # and the customer departure function to call
         super().__init__(name, self.pickupService, report_exit=report_exit)
         self.name = name
         self.service_mu = service_mu
-        self.service_rho = service_rho
+        self.service_sigma = service_sigma
         self.service_dist = service_dist
         self.report_exit = report_exit
 
@@ -252,7 +248,7 @@ class PickupStation(ModelQueue):
     # passing in the distributional parameters
 
     def pickupService(self, cust):
-        return sampleRV(self.service_mu, self.service_rho, self.service_dist)
+        return sampleRV(self.service_mu, self.service_sigma, self.service_dist)
 
 
 # ReportError is called on discovering of some error that halts
@@ -463,9 +459,9 @@ def ValidateDict(d, keys, ints, floats, dists, consts, objs=()):
 # MenuStation, PayStation, and PickupStation descriptions all use this
 
 def ValidateModelQueue(tsd):
-    keys = ('name', 'service_mu', 'service_rho', 'service_dist')
+    keys = ('name', 'service_mu', 'service_sigma', 'service_dist')
     ints = ()
-    floats = ('service_mu', 'service_rho')
+    floats = ('service_mu', 'service_sigma')
     dists = ('service_dist',)
     consts = ('expon', 'uniform', 'gaussian')
     return ValidateDict(tsd, keys, ints, floats, dists, consts)
@@ -498,7 +494,7 @@ def BuildTopo():
     # customer visits
     #
     pickup_station = PickupStation(pkd['name'], pkd['service_mu'],
-                                   pkd['service_rho'], pkd['service_dist'], report_exit=custStrm.departCust)
+                                   pkd['service_sigma'], pkd['service_dist'], report_exit=custStrm.departCust)
 
     # Focus on the json description of the pay_station 
     #
@@ -515,7 +511,7 @@ def BuildTopo():
     # describe its service distribution
     #
     pay_station = PayStation(pyd['name'], pyd['service_mu'],
-                             pyd['service_rho'], pyd['service_dist'])
+                             pyd['service_sigma'], pyd['service_dist'])
 
     # Include the previously created pickup station object as an output
     # for the pay station.
@@ -547,7 +543,7 @@ def BuildTopo():
         else:
             # Build the validated menu station object.
             ms = MenuStation(msd['name'], msd['service_mu'],
-                             msd['service_rho'], msd['service_dist'])
+                             msd['service_sigma'], msd['service_dist'])
 
             # Remember the object in a global list of all menu stations.
             MenuStations.append(ms)
